@@ -30,6 +30,10 @@
 #include "d3d12_device.h"
 #include "d3d12_resources.h"
 
+// temporary hack
+#include "3rdparty/RGP/RGP_API.h"
+extern RGP_API *rgpAPI;
+
 static const char *DXBCDisassemblyTarget = "DXBC";
 
 template <class T>
@@ -52,6 +56,13 @@ void D3D12Replay::Shutdown()
   for(size_t i = 0; i < m_ProxyResources.size(); i++)
     m_ProxyResources[i]->Release();
   m_ProxyResources.clear();
+
+  if(rgpAPI)
+  {
+    rgpAPI->Finish();
+    // temp hack - let it leak since I'm not sure if it's safe to delete immediately
+    rgpAPI = NULL;
+  }
 
   PreDeviceShutdownCounters();
 
@@ -1809,6 +1820,9 @@ ReplayStatus D3D12_CreateReplayDevice(RDCFile *rdc, IReplayDriver **driver)
 
   D3D12Replay::PreDeviceInitCounters();
 
+  rgpAPI = new RGP_API;
+  rgpAPI->Init();
+
   ID3D12Device *dev = NULL;
   HRESULT hr = RENDERDOC_CreateWrappedD3D12Device(NULL, initParams.MinimumFeatureLevel,
                                                   __uuidof(ID3D12Device), (void **)&dev);
@@ -1816,6 +1830,10 @@ ReplayStatus D3D12_CreateReplayDevice(RDCFile *rdc, IReplayDriver **driver)
   if(FAILED(hr))
   {
     RDCERR("Couldn't create a d3d12 device :(.");
+
+    rgpAPI->Finish();
+    // temp hack - let it leak since I'm not sure if it's safe to delete immediately
+    rgpAPI = NULL;
 
     return ReplayStatus::APIHardwareUnsupported;
   }

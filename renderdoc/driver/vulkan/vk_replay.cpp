@@ -32,6 +32,10 @@
 #include "vk_debug.h"
 #include "vk_resources.h"
 
+// temporary hack
+#include "3rdparty/RGP/RGP_API.h"
+extern RGP_API *rgpAPI;
+
 #define VULKAN 1
 #include "data/glsl/debuguniforms.h"
 
@@ -676,6 +680,10 @@ VulkanResourceManager *VulkanReplay::GetResourceManager()
 void VulkanReplay::Shutdown()
 {
   PreDeviceShutdownCounters();
+
+  rgpAPI->Finish();
+  // temp hack - let it leak since I'm not sure if it's safe to delete immediately
+  rgpAPI = NULL;
 
   m_pDriver->Shutdown();
   delete m_pDriver;
@@ -5561,11 +5569,18 @@ ReplayStatus Vulkan_CreateReplayDevice(RDCFile *rdc, IReplayDriver **driver)
 
   VulkanReplay::PreDeviceInitCounters();
 
+  rgpAPI = new RGP_API;
+  rgpAPI->Init();
+
   WrappedVulkan *vk = new WrappedVulkan();
   ReplayStatus status = vk->Initialise(initParams, ver);
 
   if(status != ReplayStatus::Succeeded)
   {
+    rgpAPI->Finish();
+    // temp hack - let it leak since I'm not sure if it's safe to delete immediately
+    rgpAPI = NULL;
+
     delete vk;
     return status;
   }
